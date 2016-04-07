@@ -22,34 +22,40 @@ Instance(
    3,
    \@devices);
 Connect();
-my @labels = undef;
-my @values = undef;
+my @percent = (0,0,0);
 my @warns  = @Snmp::rqueizan::warns;
 my @crits  = @Snmp::rqueizan::crits;
 my $device = $Snmp::rqueizan::device;
 switch ($device) {
    case "linux"
    {
-      @labels = LoadTableValues(".1.3.6.1.4.1.2021.10.1.2");
-      @values = LoadTableValues(".1.3.6.1.4.1.2021.10.1.3");
-      for (my $i=0;$i<3;$i++) { Add_Perfdata($labels[$i], $values[$i], undef, $warns[$i], $crits[$i], 0, $crits[$i]); }
+      my @labels = LoadTableValues(".1.3.6.1.4.1.2021.10.1.2");
+      my @values = LoadTableValues(".1.3.6.1.4.1.2021.10.1.3");
+      for (my $i=0;$i<3;$i++)
+      {
+         $percent[$i] = $values[$i];
+         Add_Perfdata($labels[$i], $values[$i], undef, $warns[$i], $crits[$i], 0, $crits[$i]);
+      }
    }
    case "huawei"
    {
-      @labels = ("load", "load1", "load5");
-      my $oid = ".1.3.6.1.4.1.2011.6.3.4.1";
-      my ($keysR, $valuesR) = LoadKeysValues($oid, 14);
+      my ($keysR, $valuesR) = LoadKeysValues(".1.3.6.1.4.1.2011.6.3.4.1", 14);
       my @keys = @{ $keysR };
       my @values = @{ $valuesR };
       my $cpus = ($#values + 1) / 3;
       for (my $i=0;$i<$cpus;$i++)
       {
-         Add_Perfdata("slot" . $keys[$i] . "load", $values[$i], undef, $warns[0], $crits[0], 0, $crits[0]);
-         Add_Perfdata("slot" . $keys[$i] . "load1", $values[$i+$cpus], undef, $warns[1], $crits[1], 0, $crits[1]);
-         Add_Perfdata("slot" . $keys[$i] . "load5", $values[$i+$cpus*2], undef, $warns[2], $crits[2], 0, $crits[2]);
+         $percent[0] = $percent[0] + $values[$i];
+         $percent[1] = $percent[1] + $values[$i+$cpus];
+         $percent[2] = $percent[2] + $values[$i+$cpus*2];
+         Add_Perfdata("slot" . $keys[$i] . "-load", $values[$i], undef, $warns[0], $crits[0], 0, $crits[0]);
+         Add_Perfdata("slot" . $keys[$i] . "-load1", $values[$i+$cpus], undef, $warns[1], $crits[1], 0, $crits[1]);
+         Add_Perfdata("slot" . $keys[$i] . "-load5", $values[$i+$cpus*2], undef, $warns[2], $crits[2], 0, $crits[2]);
       }
-      @values = LoadValues(".1.3.6.1.4.1.2011.6.3.4.1.2.0.4.0", ".1.3.6.1.4.1.2011.6.3.4.1.3.0.4.0", ".1.3.6.1.4.1.2011.6.3.4.1.4.0.4.0");
+      $percent[0] = $percent[0]/$cpus;
+      $percent[1] = $percent[1]/$cpus;
+      $percent[2] = $percent[2]/$cpus;
    }
    else { Nagios_Die("device '$device' not implemented"); }
 }
-Nagios_Exit("load average: XXX" ); # $values[0], $values[1], $values[2]
+Nagios_Exit("load average: $percent[0]%, $percent[1]%, $percent[2]%" );

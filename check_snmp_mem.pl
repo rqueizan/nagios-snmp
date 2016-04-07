@@ -9,7 +9,7 @@
 use strict;
 use warnings;
 use Switch;
-use Snmp::rqueizan qw(Instance Add_Arg Connect LoadTableValues LoadValue LoadValues Nagios_Die Nagios_Exit Add_Perfdata AutoScaleNumbers AutoScaleNumbersLower Add_Perfdata_AutoScale Round);
+use Snmp::rqueizan qw(Instance Add_Arg Connect LoadTableValues LoadValue LoadKeysValues LoadValues Nagios_Die Nagios_Exit Add_Perfdata AutoScaleNumbers AutoScaleNumbersLower Add_Perfdata_AutoScale Round);
 
 my @devices = ("linux", "huawei");
 Instance(
@@ -22,33 +22,36 @@ Instance(
    1,
    \@devices);
 Connect();
-my @labels = undef;
-my @values = undef;
-my $used = undef;
-my $percent = undef;
+my $percent = 0;
 my $warn  = $Snmp::rqueizan::warn;
 my $crit  = $Snmp::rqueizan::crit;
 my $device = $Snmp::rqueizan::device;
 switch ($device) {
    case "linux"
    {
-      @labels = ("Free", "Total", "Cached", "Buffers");
-      @values = LoadValues(".1.3.6.1.4.1.2021.4.6.0", ".1.3.6.1.4.1.2021.4.5.0", ".1.3.6.1.4.1.2021.4.15.0", ".1.3.6.1.4.1.2021.4.14.0");
+      my @labels = ("Free", "Total", "Cached", "Buffers");
+      my @values = LoadValues(".1.3.6.1.4.1.2021.4.6.0", ".1.3.6.1.4.1.2021.4.5.0", ".1.3.6.1.4.1.2021.4.15.0", ".1.3.6.1.4.1.2021.4.14.0");
       $values[0] = $values[0] + $values[2] + $values[3];
-      $used = $values[1] - $values[0];
+      my $used = $values[1] - $values[0];
       $percent = Round($used*100/$values[1],2);
       Add_Perfdata_AutoScale("Used", $used, "B", $values[1]*$warn/100, $values[1]*$crit/100, 0, $values[1], 1, 2);
       for (my $i=0;$i<=$#values;$i++) { Add_Perfdata_AutoScale($labels[$i], $values[$i], "B", undef, undef, undef, undef, 1, 2); }
    }
    case "huawei"
    {
-      @labels = ("Used1", "Total1", "Used2", "Total2");
-      @values = LoadValues("1.3.6.1.4.1.2011.6.3.5.1.1.2.0.1.0", "1.3.6.1.4.1.2011.6.3.5.1.1.2.0.4.0", "1.3.6.1.4.1.2011.6.3.5.1.1.2.0.2.0", "1.3.6.1.4.1.2011.6.3.5.1.1.2.0.5.0");
-      $percent = Round(($values[0]*100/$values[1]+$values[0]*100/$values[1])/2,2);
-      Add_Perfdata_AutoScale($labels[0], $values[0], "B", $values[1]*$warn/100, $values[1]*$crit/100, 0, $values[1], 0, 2);
-      Add_Perfdata_AutoScale($labels[2], $values[2], "B", $values[3]*$warn/100, $values[3]*$crit/100, 0, $values[3], 0, 2);
-      Add_Perfdata_AutoScale($labels[1], $values[1], "B", undef, undef, undef, undef, 0, 2);
-      Add_Perfdata_AutoScale($labels[3], $values[3], "B", undef, undef, undef, undef, 0, 2);
+      my ($keysR, $valuesTR) = LoadKeysValues(".1.3.6.1.4.1.2011.6.3.5.1.1.2", 15);
+      my ($keysFR, $valuesFR) = LoadKeysValues(".1.3.6.1.4.1.2011.6.3.5.1.1.3", 15);
+      my @keys = @{ $keysR };
+      my @totals = @{ $valuesTR };
+      my @values = @{ $valuesFR };
+      for (my $i=0;$i<=$#totals;$i++)
+      {
+         $values[$i] = $totals[$i] - $values[$i];
+         $percent = $percent +  $values[$i]*100/$totals[$i];
+         Add_Perfdata_AutoScale("slot" . $keys[$i] . "-used", $values[$i], "B", $totals[$i]*$warn/100, $totals[$i]*$crit/100, 0, $totals[$i], 0, 2);
+         Add_Perfdata_AutoScale("slot" . $keys[$i] . "-total", $totals[$i], "B", undef, undef, undef, undef, 0, 2);
+      }
+      $percent = Round($percent/($#totals+1),2);
    }
    else { Nagios_Die("device '$device' not implemented"); }
 }
