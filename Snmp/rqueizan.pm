@@ -25,16 +25,11 @@ my $ver = undef;
 my $session = undef;
 my $code = 0;
 my $countWC = undef;
-our $device = undef;
-our $warn = undef;
-our @warns = undef;
-our $crit = undef;
-our @crits = undef;
-
+my @args = ("warning","critical","device");
 
 use Exporter qw(import);
 
-our @EXPORT_OK = qw(Instance Add_Arg Connect LoadTable LoadKeysValues LoadTableValues LoadValue LoadValues Nagios_Die Nagios_Exit CheckNumber CheckNumbers CheckNumberLowerThanOther CheckNumbersLowersThanOthers CheckInList CheckNotNull Add_Perfdata AutoScaleNumber AutoScaleNumbers AutoScaleNumbersLower Round Add_Perfdata_AutoScale);
+our @EXPORT_OK = qw(Instance Add_Arg Connect LoadTable LoadKeysValues LoadTableValues LoadValue LoadValues Nagios_Die Nagios_Exit CheckNumber CheckNumbers CheckNumberLowerThanOther CheckNumbersLowersThanOthers CheckInList CheckNotNull Add_Perfdata AutoScaleNumber AutoScaleNumbers AutoScaleNumbersLower Round Add_Perfdata_AutoScale Get_Arg Get_Args Get_Warning Get_Critical Get_Device);
 
 #Public Methods
 sub Instance # usage version shortname timeout blurb extra count devices
@@ -54,9 +49,20 @@ sub Instance # usage version shortname timeout blurb extra count devices
    @devices = @{ $devicesR };
    add_Def_Arg();
 }
-sub Add_Arg
+sub Add_Arg # spec help default required
 {
-   Nagios_Die("Add_Arg: not implemented");
+   Nagios_Die("Add_Arg: required 'spec help default required'") unless @_ == 4;
+   my ($spec, $help, $default, $required) = @_;
+   CheckNotNull($spec, "Add_Arg: require valid spec");
+   CheckNotNull($help, "Add_Arg: require valid help");
+   $nagios_plugin->add_arg(
+      spec		=> $spec,
+      help		=> $help,
+      default  => $default,
+      required	=> $required,
+   );#mount|
+   my @name = split(/\|/ , $spec);
+   push(@args,$name[0]);
 }
 sub Connect
 {
@@ -67,21 +73,20 @@ sub Connect
    checkSNMP2Or3();
    if ($countWC == 1)
    {
-      $warn = $nagios_plugin->opts->warning;
-      $crit = $nagios_plugin->opts->critical;
+      my $warn = $nagios_plugin->opts->warning;
+      my $crit = $nagios_plugin->opts->critical;
       CheckNumber($warn, 0, undef, "warning");
       CheckNumber($crit, 0, undef, "critical");
       CheckNumberLowerThanOther($warn, $crit, "warning", "critical");
    }
    else
    {
-      @warns = split(/,/ , $nagios_plugin->opts->warning);
-      @crits = split(/,/ , $nagios_plugin->opts->critical);
+      my @warns = split(/,/ , $nagios_plugin->opts->warning);
+      my @crits = split(/,/ , $nagios_plugin->opts->critical);
       CheckNumbers(\@warns, $countWC, 0, undef, "warning");
       CheckNumbers(\@crits, $countWC, 0, undef, "critical");
       CheckNumbersLowersThanOthers(\@warns, \@crits, $countWC, "warning", "critical");
    }
-   $device = $nagios_plugin->opts->device;
    my $error = undef;
    if ($ver == 3)
    {
@@ -260,9 +265,9 @@ sub Add_Perfdata # label value warning critical min max
    my $result = $nagios_plugin->check_threshold(check => $value, warning => $warning, critical => $critical, );
    $code = max($code,$result);
 }
-sub Add_Perfdata_AutoScale # label value warning critical min max desp decimals
+sub Add_Perfdata_AutoScale # label value uom warning critical min max desp decimals
 {
-   Nagios_Die("Add_Perfdata_AutoScale: required 'label value, uom warning critical min max desp decimals'") unless @_ == 9;
+   Nagios_Die("Add_Perfdata_AutoScale: required 'label value uom warning critical min max desp decimals'") unless @_ == 9;
    my ($label, $value, $uom, $warning, $critical, $min, $max, $desp, $decimals) = @_;
    my @perf = ($value, $warning, $critical, $min, $max);
    my ($valsR, $uoma) = AutoScaleNumbersLower(\@perf, $uom, $desp, $decimals);
@@ -331,7 +336,34 @@ sub Round # num decimals
    CheckNumber($decimals, 0, undef, "decimals digits");
    sprintf("%." . $decimals . "f", $num);
 }
-
+sub Get_Arg # name
+{
+   Nagios_Die("Get_Arg: required 'name'") unless @_ == 1;
+   my ($name) = @_;
+   return $nagios_plugin->opts->$name;
+}
+sub Get_Args # name
+{
+   Nagios_Die("Get_Args: required 'name'") unless @_ == 1;
+   my ($name) = @_;
+   CheckInList($name, \@args, "Invalid argument '$name'");
+   return () unless defined $nagios_plugin->opts->$name;
+   return split(/,/ , $nagios_plugin->opts->$name);
+}
+sub Get_Warning
+{
+   if ($countWC == 1) { return Get_Arg("warning"); }
+   else { return Get_Args("warning"); }
+}
+sub Get_Critical
+{
+   if ($countWC == 1) { return Get_Arg("critical"); }
+   else { return Get_Args("critical"); }
+}
+sub Get_Device
+{
+   return Get_Arg("device");
+}
 #Private Methods
 sub add_Def_Arg
 {

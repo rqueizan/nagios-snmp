@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# SNMP memory check - version 1.0.2
+# SNMP memory check - version 1.0.3
 #
 # inspired by script written by one inspired from Corey Henderson
 # Author: Rene Queizan Perez, rqueizan@uci.cu rqueizan@outlook.com
@@ -9,7 +9,7 @@
 use strict;
 use warnings;
 use Switch;
-use Snmp::rqueizan qw(Instance Add_Arg Connect LoadTableValues LoadValue LoadKeysValues LoadValues Nagios_Die Nagios_Exit Add_Perfdata AutoScaleNumbers AutoScaleNumbersLower Add_Perfdata_AutoScale Round);
+use Snmp::rqueizan qw(Instance Connect LoadKeysValues LoadValues Nagios_Die Nagios_Exit Add_Perfdata_AutoScale Round Get_Warning Get_Critical Get_Device);
 
 my @devices = ("linux", "huawei");
 Instance(
@@ -23,9 +23,9 @@ Instance(
    \@devices);
 Connect();
 my $percent = 0;
-my $warn  = $Snmp::rqueizan::warn;
-my $crit  = $Snmp::rqueizan::crit;
-my $device = $Snmp::rqueizan::device;
+my $warn  = Get_Warning();
+my $crit  = Get_Critical();
+my $device = Get_Device();
 switch ($device) {
    case "linux"
    {

@@ -1,6 +1,6 @@
 #!/usr/bin/perl -w
 #
-# SNMP load check - version 1.0.3
+# SNMP load check - version 1.0.5
 #
 # inspired by script written by one inspired from Corey Henderson
 # Author: Rene Queizan Perez, rqueizan@uci.cu rqueizan@outlook.com
@@ -9,7 +9,7 @@
 use strict;
 use warnings;
 use Switch;
-use Snmp::rqueizan qw(Instance Add_Arg Connect LoadKeysValues LoadTableValues LoadValue LoadValues Nagios_Die Nagios_Exit Add_Perfdata);
+use Snmp::rqueizan qw(Instance Connect LoadKeysValues LoadTableValues Nagios_Die Nagios_Exit Add_Perfdata Get_Warning Get_Critical Get_Device);
 
 my @devices = ("linux", "huawei");
 Instance(
@@ -23,9 +23,9 @@ Instance(
    \@devices);
 Connect();
 my @percent = (0,0,0);
-my @warns  = @Snmp::rqueizan::warns;
-my @crits  = @Snmp::rqueizan::crits;
-my $device = $Snmp::rqueizan::device;
+my @warns  = Get_Warning();
+my @crits  = Get_Critical();
+my $device = Get_Device();
 switch ($device) {
    case "linux"
    {
@@ -48,9 +48,9 @@ switch ($device) {
          $percent[0] = $percent[0] + $values[$i];
          $percent[1] = $percent[1] + $values[$i+$cpus];
          $percent[2] = $percent[2] + $values[$i+$cpus*2];
-         Add_Perfdata("slot" . $keys[$i] . "-load", $values[$i], undef, $warns[0], $crits[0], 0, $crits[0]);
-         Add_Perfdata("slot" . $keys[$i] . "-load1", $values[$i+$cpus], undef, $warns[1], $crits[1], 0, $crits[1]);
-         Add_Perfdata("slot" . $keys[$i] . "-load5", $values[$i+$cpus*2], undef, $warns[2], $crits[2], 0, $crits[2]);
+         Add_Perfdata("slot" . $keys[$i] . "-load", $values[$i], undef, $warns[0], $crits[0], 0, 100);
+         Add_Perfdata("slot" . $keys[$i] . "-load1", $values[$i+$cpus], undef, $warns[1], $crits[1], 0, 100);
+         Add_Perfdata("slot" . $keys[$i] . "-load5", $values[$i+$cpus*2], undef, $warns[2], $crits[2], 0, 100);
       }
       $percent[0] = $percent[0]/$cpus;
       $percent[1] = $percent[1]/$cpus;
